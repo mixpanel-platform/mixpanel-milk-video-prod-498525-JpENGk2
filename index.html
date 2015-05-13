@@ -13,27 +13,64 @@
       <div id="propSelect" style="float: left;"></div>
       <div id="dateSelect" style="float: right;"></div>
       <div style="clear: both;"></div>
-      <div id="graph"></div>
+      <input id="n-input" type="text"></div>
     </div>
     <div id="table"></div>
     <script>
+      var OurAnything = "$custom_event:18883";
       var eventSelect = $('#eventSelect').MPEventSelect();
       var propSelect  = $('#propSelect').MPPropertySelect();
       var dateSelect  = $('#dateSelect').MPDatepicker();
-      var eventGraph  = $('#graph').MPChart({chartType: 'line'});
+      //var eventGraph  = $('#graph').MPChart({chartType: 'line'});
+      var nInput = $("#n-input").value
       var eventTable  = $('#table').MPTable({
         showPercentages: true,
         firstColHeader: 'Event'
       });
+      
+      dayN = 1
 
       var runQuery = function() {
+        console.log("I am running a query");
         var eventName = eventSelect.MPEventSelect('value'),
             propName  = propSelect.MPPropertySelect('value'),
             dateRange = dateSelect.MPDatepicker('value');
 
+        var from = new Date(dateSelect.MPDatepicker('value').from)
+        var to = new Date(dateSelect.MPDatepicker('value').to)
+        params = {
+          born_event: "install",
+          event: OurAnything,
+          from_date: from.toISOString().slice(0, 10),
+          to_date: to.toISOString().slice(0, 10)
+        }
+        
         if (eventName) {
-          MP.api.segment(eventName, propName, dateRange).done(function(results) {
-            eventGraph.MPChart('setData', results);
+          MP.api.retention(eventName, params, dateRange).done(function(results) {
+            console.log('retention return', results.json);
+            
+            var internalFrom = new Date(dateSelect.MPDatepicker('value').from)
+            var internalTo = new Date(dateSelect.MPDatepicker('value').to)
+            // add up the counts for three consecutive days
+            var interval = (internalTo - internalFrom) / (1000 * 60 * 60 * 24)
+            console.log('this many days interval', interval)
+            
+            var n = 3;
+            parsedResults = {}
+            for (i=0; i < interval/n; i++) {
+              console.log('iteration', i)
+              parsedResults[i] = []
+              tempSum = 0
+              for (j=0; j < 3; j++) {
+                thisDate = new Date(from.setDate(from.getDate() + 1)).toISOString().slice(0, 10)
+                tempSum += results.json[thisDate].counts[1]
+                console.log('current results', parsedResults)
+              }
+              parsedResults[i] = tempSum
+            }
+            
+            console.log(parsedResults)
+            
             eventTable.MPTable('setData', results);
           });
         }
@@ -45,6 +82,10 @@
       });
       propSelect.on('change', runQuery);
       dateSelect.on('change', runQuery);
+      
+      /*MP.api.retention('AppOpen').done( function(results) {
+        console.log(results.json);
+      })*/
     </script>
   </body>
 </html>
